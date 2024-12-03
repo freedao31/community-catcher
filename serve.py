@@ -1,29 +1,14 @@
 from flask import Flask, request, jsonify
 from sentence_transformers import SentenceTransformer
-import faiss
-import pickle
 
+from embedding import TextToEmbedding
+from vector_db import VectorDatabase
 # Configuration
 VECTOR_DB_FILE = 'vector_db.pkl'
 EMBEDDING_MODEL = 'all-MiniLM-L6-v2'
 
-# Load Vector Database
-class VectorDatabase:
-    def __init__(self):
-        self.index = None
-        self.metadata = []
-
-    @staticmethod
-    def load(filepath):
-        with open(filepath, 'rb') as f:
-            data = pickle.load(f)
-        db = VectorDatabase()
-        db.index = data['index']
-        db.metadata = data['metadata']
-        return db
-
 vector_db = VectorDatabase.load(VECTOR_DB_FILE)
-embedder = SentenceTransformer(EMBEDDING_MODEL)
+embedder = TextToEmbedding()
 
 # Flask App
 app = Flask(__name__)
