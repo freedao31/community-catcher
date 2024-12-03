@@ -1,40 +1,16 @@
 import discord
 from discord.ext import commands
 from sentence_transformers import SentenceTransformer
-import faiss
-import pickle
+import numpy as np
 import os
+
+from embedding import TextToEmbedding
+from vector_db import VectorDatabase
 
 # Configuration
 BOT_TOKEN = os.getenv('DISCORD_BOT_TOKEN')
 VECTOR_DB_FILE = 'vector_db.pkl'
 EMBEDDING_MODEL = 'all-MiniLM-L6-v2'  # Sentence Transformer model
-
-# Initialize Sentence Transformer
-embedder = SentenceTransformer(EMBEDDING_MODEL)
-
-# Vector DB
-class VectorDatabase:
-    def __init__(self):
-        self.index = faiss.IndexFlatL2(384)  # 384 dimensions for MiniLM
-        self.metadata = []
-
-    def add(self, embeddings, meta):
-        self.index.add(embeddings)
-        self.metadata.extend(meta)
-
-    def save(self, filepath):
-        with open(filepath, 'wb') as f:
-            pickle.dump({'index': self.index, 'metadata': self.metadata}, f)
-
-    @staticmethod
-    def load(filepath):
-        with open(filepath, 'rb') as f:
-            data = pickle.load(f)
-        db = VectorDatabase()
-        db.index = data['index']
-        db.metadata = data['metadata']
-        return db
 
 # Bot Setup
 intents = discord.Intents.default()
@@ -46,6 +22,7 @@ class IndexerBot(discord.Client):
     def __init__(self, intents, *args, **kwargs):
         super().__init__(intents=intents, *args, **kwargs)
         self.vector_db = VectorDatabase()
+        self.embedder = TextToEmbedding()
 
     async def on_ready(self):
         print(f"Logged in as {self.user}")
@@ -59,7 +36,9 @@ class IndexerBot(discord.Client):
                 try:
                     messages = [msg async for msg in channel.history(limit=None)]
                     contents = [msg.content for msg in messages if msg.content]
-                    embeddings = embedder.encode(contents, convert_to_tensor=False)
+                    embeddings = self.embedder.embed(contents)
+                    embeddings = np.array(embeddings)
+                    
                     metadata = [
                         {
                             "summary": f"{msg.content[:100]}",
